@@ -2,7 +2,7 @@
 let mode = 'full';
 let quizQuestions = [];
 let currentIdx = 0;
-let answered = [];   // null | index of chosen option
+let answered = [];
 let chatHistory = [];
 let chatOpen = false;
 
@@ -64,22 +64,18 @@ function renderQ() {
   const wrongCount = doneCount - correctCount;
   const pct = Math.round((currentIdx / total) * 100);
 
-  // Header
   document.getElementById('progress-fill').style.width = pct + '%';
   document.getElementById('progress-label').textContent = `${currentIdx + 1} / ${total}`;
   document.getElementById('score-chip').textContent = `✓ ${correctCount}  ✗ ${wrongCount}`;
   document.getElementById('nav-counter').textContent = `${currentIdx + 1} de ${total}`;
 
-  // Q meta
   document.getElementById('q-meta').innerHTML =
     `<span class="badge badge-num">#${currentIdx + 1}</span>` +
     `<span class="badge badge-topic">${q.tema}</span>` +
     `<span class="badge badge-sim">${q.sim} • Q${q.num}</span>`;
 
-  // Q text
   document.getElementById('q-text').textContent = q.q;
 
-  // Options
   const done = answered[currentIdx] !== null;
   const chosen = answered[currentIdx];
   const optContainer = document.getElementById('options');
@@ -97,7 +93,6 @@ function renderQ() {
     optContainer.appendChild(btn);
   });
 
-  // Feedback
   const fb = document.getElementById('feedback-card');
   const fbIcon = document.getElementById('fb-icon');
   const fbVerdict = document.getElementById('fb-verdict');
@@ -112,14 +107,20 @@ function renderQ() {
     fb.className = 'feedback-card show ' + (isCorrect ? 'correct' : 'wrong');
     fbIcon.textContent = isCorrect ? '✓' : '✗';
     fbVerdict.textContent = isCorrect ? 'Correto!' : 'Incorreto.';
-    fbText.textContent = isCorrect ? q.exp : `A resposta correta é: ${String.fromCharCode(65 + q.ans)}) ${q.opts[q.ans]}`;
-    commentExtra.style.display = 'none';
-    commentExtra.textContent = '';
 
     if (isCorrect) {
-      btnComment.classList.add('visible');
+      fbText.textContent = q.exp;
+      commentExtra.style.display = 'none';
+      commentExtra.textContent = '';
+      btnComment.classList.remove('visible');
       btnChat.classList.remove('visible');
     } else {
+      const corrLetter = String.fromCharCode(65 + q.ans);
+      const corrText = q.opts[q.ans];
+      fbText.innerHTML =
+        `<strong>A resposta correta é ${corrLetter}) ${corrText}</strong><br><br>${q.exp}`;
+      commentExtra.style.display = 'none';
+      commentExtra.textContent = '';
       btnComment.classList.remove('visible');
       btnChat.classList.add('visible');
     }
@@ -130,16 +131,12 @@ function renderQ() {
     btnChat.classList.remove('visible');
   }
 
-  // Close chat on question change
   closeChatSilent();
 
-  // Nav buttons
   document.getElementById('btn-prev').disabled = currentIdx === 0;
   document.getElementById('btn-next').disabled = !done;
   document.getElementById('btn-next').textContent = currentIdx === total - 1 ? 'Ver resultado ↗' : 'Próxima →';
 
-  // Scroll to top
-  document.querySelector('.quiz-body').scrollTop = 0;
   window.scrollTo(0, 0);
 }
 
@@ -147,17 +144,16 @@ function renderQ() {
 function answer(idx) {
   if (answered[currentIdx] !== null) return;
   answered[currentIdx] = idx;
-  renderQ();
 
-  // Auto-inject context into chat
+  // Prepare chat context for this question
   const q = quizQuestions[currentIdx];
-  chatHistory = [{
-    role: 'user',
-    content: `Contexto da questão de estudo:\nQuestão: ${q.q}\nAlternativas: ${q.opts.map((o, i) => String.fromCharCode(65+i)+') '+o).join(' | ')}\nGabarito: ${String.fromCharCode(65+q.ans)}) ${q.opts[q.ans]}\nExplicação do gabarito: ${q.exp}\nTema: ${q.tema} | Simulado: ${q.sim}\n\nO aluno está estudando para a prova de Arrais-Amador da Marinha do Brasil. Responda dúvidas sobre esta questão de forma clara e didática.`
-  }];
+  chatHistory = [];
+  addSystemContext(q);
+
+  renderQ();
 }
 
-// ---- Show comment (for correct) ----
+// ---- Show comment ----
 function showComment() {
   const q = quizQuestions[currentIdx];
   const extra = document.getElementById('comment-extra');
@@ -167,6 +163,19 @@ function showComment() {
 }
 
 // ---- Chat ----
+function addSystemContext(q) {
+  // This is used internally to prime the chat responses
+  chatHistory = [{
+    role: 'system',
+    q: q.q,
+    opts: q.opts,
+    ans: q.ans,
+    exp: q.exp,
+    tema: q.tema,
+    sim: q.sim
+  }];
+}
+
 function openChat() {
   chatOpen = true;
   const section = document.getElementById('chat-section');
@@ -175,7 +184,11 @@ function openChat() {
 
   if (msgs.children.length === 0) {
     const q = quizQuestions[currentIdx];
-    appendMsg('ai', `Olá! Posso te ajudar com qualquer dúvida sobre esta questão de ${q.tema}. O que você quer entender melhor?`);
+    appendMsg('ai',
+      `Posso te ajudar com esta questão de ${q.tema}.\n\n` +
+      `A resposta correta é ${String.fromCharCode(65 + q.ans)}) ${q.opts[q.ans]}.\n\n` +
+      `${q.exp}\n\nTem alguma dúvida específica sobre o conteúdo?`
+    );
   }
 
   document.getElementById('chat-input').focus();
@@ -196,11 +209,122 @@ function closeChatSilent() {
 function appendMsg(role, text) {
   const div = document.createElement('div');
   div.className = 'msg ' + role;
+  // Support newlines
+  div.style.whiteSpace = 'pre-wrap';
   div.textContent = text;
   const msgs = document.getElementById('chat-messages');
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
   return div;
+}
+
+// ---- Smart local chat engine ----
+function buildSmartReply(userMsg, q) {
+  const msg = userMsg.toLowerCase();
+
+  // Helpers
+  const corrLetter = String.fromCharCode(65 + q.ans);
+  const corrText = q.opts[q.ans];
+
+  // --- Pattern matching ---
+
+  // Why is this the answer?
+  if (/(por que|porque|motivo|razão|explica|como assim|entender|não entendi|sentido)/i.test(msg)) {
+    return `${q.exp}\n\nEm resumo: a resposta ${corrLetter}) "${corrText}" é a correta porque ${q.exp.split('.')[0].toLowerCase()}.`;
+  }
+
+  // About a specific wrong option
+  const optMatch = msg.match(/\b(letra|opção|alternativa|item)?\s*([a-e])\b/i);
+  if (optMatch) {
+    const letter = optMatch[2].toUpperCase();
+    const optIdx = letter.charCodeAt(0) - 65;
+    if (optIdx >= 0 && optIdx < q.opts.length) {
+      if (optIdx === q.ans) {
+        return `Isso mesmo! A alternativa ${letter}) "${q.opts[optIdx]}" é a CORRETA.\n\n${q.exp}`;
+      } else {
+        return `A alternativa ${letter}) "${q.opts[optIdx]}" está INCORRETA.\n\n${q.exp}\n\nA correta é ${corrLetter}) "${corrText}".`;
+      }
+    }
+  }
+
+  // RIPEAM questions
+  if (/(ripeam|abalroamento|colisão|rumo|manobra|ultrapassagem|alcançando|alcançada)/i.test(msg)) {
+    return `${q.exp}\n\nDica extra sobre o RIPEAM: em rumos cruzados, quem vê a luz VERDE da outra tem preferência (avistou pelo bombordo). Quem vê a luz VERMELHA deve manobrar. Na situação roda a roda, ambas guinam para boreste.`;
+  }
+
+  // Balizamento questions
+  if (/(balizamento|boia|sinal|iala|cardinal|lateral|tope|cor|encarnada|verde|amarela)/i.test(msg)) {
+    return `${q.exp}\n\nDica de balizamento IALA-B: ao ENTRAR no porto, encarnado à direita (boreste) e verde à esquerda (bombordo). À noite, reconhece-se pelo ritmo e cor das luzes. De dia, pela forma, cor e marca de tope.`;
+  }
+
+  // Fire/extinguisher questions
+  if (/(incêndio|extintor|fogo|combustível|comburente|classe|pó|co2|espuma|halon)/i.test(msg)) {
+    return `${q.exp}\n\nDica extra: Classe A = sólidos (madeira, papel) → extintor de água ou pó ABC. Classe B = líquidos (gasolina, óleo) → CO₂, pó ou espuma. Classe C = elétrico → CO₂ ou pó seco. Classe D = metais → pó específico.`;
+  }
+
+  // Stability questions
+  if (/(estabilidade|borda livre|calado|pontal|peso|banda|alquebramento|embarcar|desembarcar)/i.test(msg)) {
+    return `${q.exp}\n\nDica: Pontal = borda livre + calado (não muda). Ao embarcar peso: borda livre diminui, calado aumenta. Ao desembarcar: borda livre aumenta, calado diminui. Peso alto = instabilidade.`;
+  }
+
+  // Safety/life jacket
+  if (/(colete|salva-vidas|flutuação|balsa|abandono|naufrágio)/i.test(msg)) {
+    return `${q.exp}\n\nDica: coletes devem corresponder à lotação da embarcação (consta no TIE). Na moto aquática, condutor E passageiro devem usar o colete classe V vestido durante toda a navegação.`;
+  }
+
+  // Anchoring questions
+  if (/(fundeio|âncora|amarra|tença|arinque|garrando)/i.test(msg)) {
+    return `${q.exp}\n\nDica de fundeio: regra do 1/3 da amarra — permanência curta = 3x a profundidade; permanência longa ou amarra mista = 5x; mau tempo = 8x. Melhores fundos: areia e lama.`;
+  }
+
+  // First aid
+  if (/(primeiros socorros|fratura|hemorragia|queimadura|torniquete|rcp|afogado|choque elétrico)/i.test(msg)) {
+    return `${q.exp}\n\nDica: fratura de BRAÇO → imobilizar dobrado. Fratura de PERNA → imobilizar esticada. Torniquete → só após esgotar a compressão; aliviar 1 min a cada 15 min (exceto amputações). Queimadura → água do mar é excelente.`;
+  }
+
+  // Meteorology
+  if (/(meteorologia|frente|vento|barômetro|pressão|brisa|terral|ressaca|tempestade)/i.test(msg)) {
+    return `${q.exp}\n\nDica: queda rápida do barômetro = mau tempo se aproximando. Frente fria = tempo piora com ventos fortes. Brisa marinha = do mar para a terra (dia). Terral = da terra para o mar (noite). Vento nordeste VEM do nordeste.`;
+  }
+
+  // Legal/LESTA
+  if (/(lesta|multa|infração|habilitação|suspensão|cassação|punição|penalidade|grupo)/i.test(msg)) {
+    return `${q.exp}\n\nTabela de multas: Grupo A (doc. vencido) → R$40–200. Grupo B (não portar) → R$40–400. Grupo D (área de banhistas) → até R$1.600 ou suspensão 60 dias. Grupo E (sem habilitação) → até R$2.200. Grupo G (não comunicar acidente) → até R$3.200 ou suspensão 12 meses.`;
+  }
+
+  // Signals / whistles
+  if (/(apito|sinal sonoro|longo|curto|buzina|visibilidade restrita)/i.test(msg)) {
+    return `${q.exp}\n\nResumo de apitos: 1 curto = guino a boreste. 2 curtos = guino a bombordo. 3 curtos = máquinas atrás. 5+ curtos = perigo/não entendi. 2 longos + 1 curto = ultrapasso por seu boreste. 2 longos + 2 curtos = ultrapasso por seu bombordo. 1 longo / 2 min = em movimento em nevoeiro.`;
+  }
+
+  // Navigation lights
+  if (/(luz|lanterna|encarnada|verde|branca|amarela|setor|alcançado|reboque|mastro)/i.test(msg)) {
+    return `${q.exp}\n\nResumo de luzes: Boreste = verde (112,5°). Bombordo = encarnada (112,5°). Alcançado/popa = branca (135°). Reboque = amarela sobre a de alcançado (135°). Mastro = branca (225°). Fundeado = branca circular 360°.`;
+  }
+
+  // Mooring/lines
+  if (/(espia|través|lançante|espringue|aduchar|atracar|defensas)/i.test(msg)) {
+    return `${q.exp}\n\nEspias: Través = perpendicular ao cais, impede se afastar. Lançante de proa = impede cair a ré. Lançante de popa = impede cair a vante. Espringue de proa = impede cair a vante. Espringue de popa = impede cair a ré. Aduchar = enrolar em voltas grandes.`;
+  }
+
+  // Survival
+  if (/(sobrevivência|náufrago|balsa|água do mar|desidratação|hipotermia|help|deriva)/i.test(msg)) {
+    return `${q.exp}\n\nDicas de sobrevivência: NUNCA beber água do mar. Permanecer no local após comunicar posição. Posição HELP = joelhos ao peito, braços cruzados. Economizar energia. Cobrir da exposição solar. Ração moderna = carboidratos de rápida assimilação.`;
+  }
+
+  // Difference between options
+  if (/(diferença|diferente|confundo|similar|parecida|mesma coisa)/i.test(msg)) {
+    const optsText = q.opts.map((o, i) => `${String.fromCharCode(65+i)}) ${o}`).join('\n');
+    return `Veja as diferenças entre as alternativas:\n\n${optsText}\n\nA correta é ${corrLetter}) porque: ${q.exp}`;
+  }
+
+  // Generic help
+  if (/(ajuda|não sei|tô confuso|difícil|pode explicar|resumo|dica|macete)/i.test(msg)) {
+    return `Claro! Esta questão é sobre ${q.tema}.\n\n${q.exp}\n\nA resposta é ${corrLetter}) "${corrText}".\n\nQuer que eu explique alguma parte específica?`;
+  }
+
+  // Default fallback
+  return `${q.exp}\n\nA resposta correta desta questão é ${corrLetter}) "${corrText}".\n\nSe quiser, pergunte sobre algum ponto específico: por que as outras alternativas estão erradas, macetes para memorizar, ou como esse tema cai na prova.`;
 }
 
 async function sendChat() {
@@ -211,43 +335,22 @@ async function sendChat() {
 
   appendMsg('user', text);
 
-  chatHistory.push({ role: 'user', content: text });
+  const q = quizQuestions[currentIdx];
 
-  const typing = appendMsg('ai', 'Digitando...');
+  // Show typing indicator
+  const typing = appendMsg('ai', '...');
   typing.classList.add('typing');
 
-  try {
-    const messages = chatHistory.length === 1
-      ? chatHistory
-      : chatHistory;
+  // Small delay to feel natural
+  await new Promise(r => setTimeout(r, 400 + Math.random() * 300));
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 600,
-        system: 'Você é um professor de náutica especializado no exame de Arrais-Amador da Marinha do Brasil. Responda de forma clara, didática e objetiva. Use linguagem simples. Não escreva mais do que 150 palavras por resposta. Se precisar listar pontos, use texto corrido.',
-        messages: messages
-      })
-    });
+  const reply = buildSmartReply(text, q);
 
-    const data = await res.json();
-    const reply = data.content?.[0]?.text || 'Não consegui responder. Tente novamente.';
+  typing.classList.remove('typing');
+  typing.textContent = reply;
+  typing.style.whiteSpace = 'pre-wrap';
 
-    typing.classList.remove('typing');
-    typing.textContent = reply;
-
-    chatHistory.push({ role: 'assistant', content: reply });
-
-    // keep history lean
-    if (chatHistory.length > 10) {
-      chatHistory = [chatHistory[0], ...chatHistory.slice(-8)];
-    }
-  } catch (e) {
-    typing.classList.remove('typing');
-    typing.textContent = 'Erro ao conectar. Verifique sua conexão e tente novamente.';
-  }
+  document.getElementById('chat-messages').scrollTop = 9999;
 }
 
 // ---- Navigation ----
@@ -297,15 +400,11 @@ function showResult() {
   });
 }
 
-// ---- Restart ----
 function restartSame() {
   answered = new Array(quizQuestions.length).fill(null);
   currentIdx = 0;
   chatHistory = [];
-
-  // reshuffle same pool
   quizQuestions = shuffleArray(quizQuestions);
-
   document.getElementById('result-screen').style.display = 'none';
   document.getElementById('quiz-screen').style.display = 'block';
   renderQ();
@@ -317,7 +416,6 @@ function backToSplash() {
   document.getElementById('splash').style.display = 'flex';
 }
 
-// ---- Utils ----
 function shuffleArray(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
