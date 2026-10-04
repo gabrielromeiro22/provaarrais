@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arrais-Amador — Simulado do Tenente Flávio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy: #0B2545;
+    --navy-mid: #163364;
+    --sea: #1A6B8A;
+    --wave: #2CA4C2;
+    --sand: #E8DCC8;
+    --sand-light: #F5F0E8;
+    --white: #FFFFFF;
+    --ink: #0B2545;
+    --muted: #5A7A8A;
+    --correct: #1A7A4A;
+    --correct-bg: #E6F5ED;
+    --correct-border: #5CB88A;
+    --wrong: #A82020;
+    --wrong-bg: #FAEAEA;
+    --wrong-border: #D07070;
+    --radius: 10px;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--navy);
+    color: var(--white);
+    min-height: 100vh;
+  }
+
+  /* ---- SPLASH ---- */
+  #splash {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.5rem;
+    background: linear-gradient(160deg, var(--navy) 0%, var(--navy-mid) 60%, #0D3B5E 100%);
+    text-align: center;
+  }
+  .anchor-icon { font-size: 3.5rem; margin-bottom: 1rem; }
+  .splash-eyebrow { font-size: 0.75rem; letter-spacing: 0.2em; color: var(--wave); text-transform: uppercase; margin-bottom: 0.75rem; }
+  .splash-title { font-family: 'Syne', sans-serif; font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 800; line-height: 1.1; margin-bottom: 0.5rem; }
+  .splash-sub { font-size: clamp(0.9rem, 2vw, 1.1rem); color: var(--sand); opacity: 0.85; margin-bottom: 2.5rem; max-width: 480px; }
+  .stats-row { display: flex; gap: 2rem; justify-content: center; margin-bottom: 2.5rem; flex-wrap: wrap; }
+  .stat-box { text-align: center; }
+  .stat-num { font-family: 'Syne', sans-serif; font-size: 2rem; font-weight: 800; color: var(--wave); }
+  .stat-label { font-size: 0.75rem; color: var(--sand); opacity: 0.7; }
+  .mode-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; max-width: 720px; width: 100%; margin-bottom: 2rem; }
+  .mode-card { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: var(--radius); padding: 1.4rem 1.2rem; cursor: pointer; transition: background 0.15s, border-color 0.15s; text-align: left; }
+  .mode-card:hover { background: rgba(44,164,194,0.15); border-color: var(--wave); }
+  .mode-card.selected { background: rgba(44,164,194,0.2); border-color: var(--wave); }
+  .mode-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.3rem; }
+  .mode-card p { font-size: 0.8rem; color: var(--sand); opacity: 0.75; }
+  .mode-icon { font-size: 1.5rem; margin-bottom: 0.6rem; }
+  .btn-start {
+    background: var(--wave);
+    color: var(--navy);
+    font-family: 'Inter', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    padding: 0.9rem 2.5rem;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .btn-start:hover { background: #3ABBD4; transform: translateY(-1px); }
+  .btn-start:active { transform: translateY(0); }
+
+  /* ---- QUIZ LAYOUT ---- */
+  #quiz-screen { display: none; min-height: 100vh; background: var(--sand-light); color: var(--ink); }
+
+  .quiz-header {
+    background: var(--navy);
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .quiz-header-left { display: flex; align-items: center; gap: 0.75rem; }
+  .btn-back { background: none; border: none; color: var(--sand); cursor: pointer; font-size: 1.3rem; line-height: 1; padding: 0.2rem; }
+  .quiz-title-small { font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700; color: var(--white); }
+  .progress-wrap { flex: 1; max-width: 300px; }
+  .progress-bar-bg { background: rgba(255,255,255,0.15); border-radius: 99px; height: 5px; }
+  .progress-bar-fill { background: var(--wave); height: 5px; border-radius: 99px; transition: width 0.4s; }
+  .progress-label { font-size: 0.7rem; color: var(--sand); opacity: 0.7; margin-top: 3px; text-align: right; }
+  .score-chip { background: rgba(44,164,194,0.2); border: 1px solid var(--wave); border-radius: 50px; padding: 0.25rem 0.75rem; font-size: 0.8rem; font-weight: 600; color: var(--wave); white-space: nowrap; }
+
+  .quiz-body { max-width: 720px; margin: 0 auto; padding: 1.5rem 1.25rem 6rem; }
+
+  .q-meta { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+  .badge { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 4px; }
+  .badge-topic { background: #DDE8F0; color: var(--sea); }
+  .badge-sim { background: #E8E0D4; color: #7A5C30; }
+  .badge-num { background: var(--navy); color: var(--white); }
+
+  .q-text { font-size: 1.05rem; font-weight: 500; line-height: 1.65; margin-bottom: 1.25rem; color: var(--ink); }
+
+  .options { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1.25rem; }
+  .opt-btn {
+    display: flex; align-items: flex-start; gap: 0.75rem;
+    background: var(--white);
+    border: 1.5px solid #D8CEB8;
+    border-radius: var(--radius);
+    padding: 0.8rem 1rem;
+    cursor: pointer;
+    text-align: left;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.92rem;
+    color: var(--ink);
+    line-height: 1.5;
+    transition: border-color 0.12s, background 0.12s;
+  }
+  .opt-btn:hover:not(:disabled) { border-color: var(--sea); background: #F0F8FF; }
+  .opt-letter { font-weight: 700; font-size: 0.8rem; color: var(--muted); min-width: 16px; margin-top: 1px; }
+  .opt-btn.correct { background: var(--correct-bg); border-color: var(--correct-border); }
+  .opt-btn.correct .opt-letter { color: var(--correct); }
+  .opt-btn.wrong { background: var(--wrong-bg); border-color: var(--wrong-border); }
+  .opt-btn.wrong .opt-letter { color: var(--wrong); }
+
+  /* ---- FEEDBACK CARD ---- */
+  .feedback-card {
+    border-radius: var(--radius);
+    padding: 1rem 1.1rem;
+    margin-bottom: 1rem;
+    display: none;
+  }
+  .feedback-card.show { display: block; }
+  .feedback-card.correct { background: var(--correct-bg); border: 1px solid var(--correct-border); }
+  .feedback-card.wrong { background: var(--wrong-bg); border: 1px solid var(--wrong-border); }
+  .feedback-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+  .feedback-icon { font-size: 1.1rem; }
+  .feedback-verdict { font-weight: 700; font-size: 0.92rem; }
+  .feedback-card.correct .feedback-verdict { color: var(--correct); }
+  .feedback-card.wrong .feedback-verdict { color: var(--wrong); }
+  .feedback-text { font-size: 0.88rem; line-height: 1.65; color: #2A2A2A; }
+  .btn-show-comment {
+    background: none;
+    border: 1px solid var(--correct-border);
+    border-radius: 6px;
+    color: var(--correct);
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 0.35rem 0.8rem;
+    cursor: pointer;
+    margin-top: 0.5rem;
+    display: none;
+  }
+  .btn-show-comment.visible { display: inline-block; }
+
+  /* ---- CHAT ---- */
+  .chat-section {
+    background: var(--white);
+    border: 1px solid #D8CEB8;
+    border-radius: var(--radius);
+    margin-bottom: 1rem;
+    display: none;
+    flex-direction: column;
+    max-height: 380px;
+  }
+  .chat-section.open { display: flex; }
+  .chat-header { padding: 0.65rem 1rem; border-bottom: 1px solid #EDE5D8; display: flex; justify-content: space-between; align-items: center; }
+  .chat-header-title { font-size: 0.82rem; font-weight: 600; color: var(--sea); }
+  .btn-close-chat { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; line-height: 1; }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.6rem; }
+  .msg { max-width: 88%; padding: 0.55rem 0.8rem; border-radius: 8px; font-size: 0.86rem; line-height: 1.55; }
+  .msg.user { background: var(--navy); color: var(--white); align-self: flex-end; border-bottom-right-radius: 3px; }
+  .msg.ai { background: #F0F4F8; color: var(--ink); align-self: flex-start; border-bottom-left-radius: 3px; }
+  .msg.typing { color: var(--muted); font-style: italic; }
+  .chat-input-row { display: flex; gap: 0.5rem; padding: 0.65rem 1rem; border-top: 1px solid #EDE5D8; }
+  .chat-input {
+    flex: 1;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.88rem;
+    padding: 0.5rem 0.8rem;
+    border: 1px solid #D8CEB8;
+    border-radius: 6px;
+    outline: none;
+    color: var(--ink);
+    background: #FAFAFA;
+  }
+  .chat-input:focus { border-color: var(--sea); }
+  .btn-send {
+    background: var(--sea);
+    color: var(--white);
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 0.9rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .btn-send:hover { background: var(--wave); }
+  .btn-open-chat {
+    display: none;
+    align-items: center;
+    gap: 0.4rem;
+    background: none;
+    border: 1px solid var(--wrong-border);
+    border-radius: 6px;
+    color: var(--wrong);
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 0.35rem 0.8rem;
+    cursor: pointer;
+    margin-top: 0.5rem;
+  }
+  .btn-open-chat.visible { display: inline-flex; }
+
+  /* ---- NAV BAR ---- */
+  .quiz-nav {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--white);
+    border-top: 1px solid #D8CEB8;
+    padding: 0.75rem 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 720px;
+    margin: 0 auto;
+    z-index: 50;
+  }
+  /* fix fixed centering */
+  .quiz-nav-outer {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--white);
+    border-top: 1px solid #D8CEB8;
+    z-index: 50;
+  }
+  .quiz-nav-inner {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0.75rem 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .btn-nav {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 600;
+    padding: 0.6rem 1.3rem;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .btn-nav.secondary { background: #EDE5D8; color: var(--ink); }
+  .btn-nav.secondary:hover { background: #E0D4BE; }
+  .btn-nav.primary { background: var(--navy); color: var(--white); }
+  .btn-nav.primary:hover { background: var(--navy-mid); }
+  .btn-nav:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* ---- RESULT SCREEN ---- */
+  #result-screen {
+    display: none;
+    min-height: 100vh;
+    background: linear-gradient(160deg, var(--navy) 0%, var(--navy-mid) 100%);
+    color: var(--white);
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.5rem;
+  }
+  .result-card { max-width: 560px; width: 100%; text-align: center; }
+  .result-circle {
+    width: 110px; height: 110px;
+    border-radius: 50%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    margin: 0 auto 1.5rem;
+    font-family: 'Syne', sans-serif;
+  }
+  .result-circle.pass { background: rgba(26,122,74,0.25); border: 2px solid var(--correct-border); }
+  .result-circle.fail { background: rgba(168,32,32,0.2); border: 2px solid var(--wrong-border); }
+  .result-pct { font-size: 1.8rem; font-weight: 800; }
+  .result-label { font-size: 0.7rem; opacity: 0.7; }
+  .result-title { font-family: 'Syne', sans-serif; font-size: 1.7rem; font-weight: 800; margin-bottom: 0.5rem; }
+  .result-sub { font-size: 0.95rem; color: var(--sand); opacity: 0.8; margin-bottom: 2rem; }
+  .result-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 0.75rem; margin-bottom: 2rem; }
+  .result-stat { background: rgba(255,255,255,0.07); border-radius: 8px; padding: 0.75rem; }
+  .result-stat-n { font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 800; }
+  .result-stat-l { font-size: 0.7rem; opacity: 0.6; margin-top: 2px; }
+  .result-review { width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left; margin-bottom: 2rem; }
+  .result-review th { color: var(--sand); opacity: 0.6; font-weight: 500; padding: 0.35rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .result-review td { padding: 0.4rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.06); vertical-align: top; }
+  .result-btns { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
+  .btn-result {
+    font-family: 'Inter', sans-serif; font-size: 0.92rem; font-weight: 600;
+    padding: 0.7rem 1.5rem; border-radius: 50px; border: none; cursor: pointer; transition: all 0.12s;
+  }
+  .btn-result.primary { background: var(--wave); color: var(--navy); }
+  .btn-result.primary:hover { background: #3ABBD4; }
+  .btn-result.secondary { background: rgba(255,255,255,0.1); color: var(--white); border: 1px solid rgba(255,255,255,0.25); }
+  .btn-result.secondary:hover { background: rgba(255,255,255,0.15); }
+
+  @media (max-width: 480px) {
+    .quiz-header { flex-wrap: wrap; gap: 0.5rem; }
+    .progress-wrap { order: 3; width: 100%; max-width: none; }
+    .stats-row { gap: 1.2rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- SPLASH -->
+<div id="splash">
+  <div class="anchor-icon">⚓</div>
+  <div class="splash-eyebrow">Marinha do Brasil · Tenente Flávio</div>
+  <h1 class="splash-title">Simulado<br>Arrais-Amador</h1>
+  <p class="splash-sub">240 questões reais dos simulados ARA-1 ao ARA-6, com gabarito, comentários e chat para tirar dúvidas.</p>
+  <div class="stats-row">
+    <div class="stat-box"><div class="stat-num">240</div><div class="stat-label">questões</div></div>
+    <div class="stat-box"><div class="stat-num">6</div><div class="stat-label">simulados</div></div>
+    <div class="stat-box"><div class="stat-num">20</div><div class="stat-label">temas</div></div>
+  </div>
+  <div class="mode-cards">
+    <div class="mode-card selected" data-mode="full" onclick="selectMode(this)">
+      <div class="mode-icon">📋</div>
+      <h3>Simulado completo</h3>
+      <p>40 questões, como na prova real. Precisa de 20 acertos para passar.</p>
+    </div>
+    <div class="mode-card" data-mode="quick" onclick="selectMode(this)">
+      <div class="mode-icon">⚡</div>
+      <h3>Treino rápido</h3>
+      <p>20 questões aleatórias de todos os temas. Bom para revisar.</p>
+    </div>
+    <div class="mode-card" data-mode="tema" onclick="selectMode(this)">
+      <div class="mode-icon">🎯</div>
+      <h3>Por tema</h3>
+      <p>Foque nos assuntos que você quer revisar.</p>
+    </div>
+  </div>
+  <div id="tema-select" style="display:none; margin-bottom:1.5rem; max-width:480px; width:100%;">
+    <select id="tema-dropdown" style="width:100%; padding:0.75rem 1rem; border-radius:8px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.08); color:var(--white); font-family:'Inter',sans-serif; font-size:0.95rem; cursor:pointer;">
+      <option value="">— Escolha um tema —</option>
+    </select>
+  </div>
+  <button class="btn-start" onclick="startQuiz()">Começar simulado →</button>
+</div>
+
+<!-- QUIZ -->
+<div id="quiz-screen">
+  <div class="quiz-header">
+    <div class="quiz-header-left">
+      <button class="btn-back" onclick="backToSplash()" title="Voltar">←</button>
+      <span class="quiz-title-small" id="quiz-title-label">Arrais-Amador</span>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
+      <div class="progress-label" id="progress-label">0 / 0</div>
+    </div>
+    <div class="score-chip" id="score-chip">✓ 0 &nbsp;✗ 0</div>
+  </div>
+
+  <div class="quiz-body">
+    <div class="q-meta" id="q-meta"></div>
+    <div class="q-text" id="q-text"></div>
+    <div class="options" id="options"></div>
+    <div class="feedback-card" id="feedback-card">
+      <div class="feedback-header">
+        <span class="feedback-icon" id="fb-icon"></span>
+        <span class="feedback-verdict" id="fb-verdict"></span>
+      </div>
+      <div class="feedback-text" id="fb-text"></div>
+      <button class="btn-show-comment" id="btn-show-comment" onclick="showComment()">Ver resposta comentada</button>
+      <div id="comment-extra" style="display:none; margin-top:0.6rem; font-size:0.85rem; color:#1A4A2A; border-top:1px solid rgba(0,0,0,0.08); padding-top:0.6rem;"></div>
+    </div>
+    <button class="btn-open-chat" id="btn-open-chat" onclick="openChat()">💬 Tirar dúvida sobre esta questão</button>
+    <div class="chat-section" id="chat-section">
+      <div class="chat-header">
+        <span class="chat-header-title">💬 Assistente de estudo</span>
+        <button class="btn-close-chat" onclick="closeChat()">✕</button>
+      </div>
+      <div class="chat-messages" id="chat-messages"></div>
+      <div class="chat-input-row">
+        <input class="chat-input" id="chat-input" placeholder="Pergunte sobre esta questão..." onkeydown="if(event.key==='Enter') sendChat()">
+        <button class="btn-send" onclick="sendChat()">Enviar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="quiz-nav-outer">
+    <div class="quiz-nav-inner">
+      <button class="btn-nav secondary" id="btn-prev" onclick="navQ(-1)">← Anterior</button>
+      <span id="nav-counter" style="font-size:0.82rem; color:var(--muted); font-weight:500;"></span>
+      <button class="btn-nav primary" id="btn-next" onclick="navQ(1)">Próxima →</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESULT -->
+<div id="result-screen">
+  <div class="result-card">
+    <div class="result-circle" id="result-circle">
+      <div class="result-pct" id="result-pct"></div>
+      <div class="result-label" id="result-label-small"></div>
+    </div>
+    <h2 class="result-title" id="result-title"></h2>
+    <p class="result-sub" id="result-sub"></p>
+    <div class="result-stats">
+      <div class="result-stat"><div class="result-stat-n" id="r-correct" style="color:#5CB88A"></div><div class="result-stat-l">acertos</div></div>
+      <div class="result-stat"><div class="result-stat-n" id="r-total"></div><div class="result-stat-l">questões</div></div>
+      <div class="result-stat"><div class="result-stat-n" id="r-wrong" style="color:#D07070"></div><div class="result-stat-l">erros</div></div>
+    </div>
+    <table class="result-review" id="result-review">
+      <thead><tr><th></th><th>Tema</th><th>Questão</th></tr></thead>
+      <tbody id="result-review-body"></tbody>
+    </table>
+    <div class="result-btns">
+      <button class="btn-result primary" onclick="restartSame()">↺ Refazer este simulado</button>
+      <button class="btn-result secondary" onclick="backToSplash()">← Voltar ao início</button>
+    </div>
+  </div>
+</div>
+
+<script src="questions.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
